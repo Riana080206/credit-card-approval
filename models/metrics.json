@@ -1,0 +1,48 @@
+{
+    "model_name": "Logistic Regression with GridSearchCV",
+    "dataset": "UCI Credit Approval (crx.data)",
+    "test_samples": 138,
+    "accuracy": 0.8768,
+    "precision": 0.8333,
+    "recall": 0.9016,
+    "f1_score": 0.8661,
+    "cv_score": 0.855,
+    "best_hyperparameters": {
+        "classifier__C": 0.1,
+        "classifier__class_weight": "balanced",
+        "classifier__solver": "liblinear"
+    },
+    "confusion_matrix": {
+        "true_negatives": 66,
+        "false_positives": 11,
+        "false_negatives": 6,
+        "true_positives": 55
+    },
+    "classification_report": {
+        "Rejected (0)": {
+            "precision": 0.9166666666666666,
+            "recall": 0.8571428571428571,
+            "f1-score": 0.8859060402684564,
+            "support": 77.0
+        },
+        "Approved (1)": {
+            "precision": 0.8333333333333334,
+            "recall": 0.9016393442622951,
+            "f1-score": 0.8661417322834646,
+            "support": 61.0
+        },
+        "accuracy": 0.8768115942028986,
+        "macro avg": {
+            "precision": 0.875,
+            "recall": 0.8793911007025761,
+            "f1-score": 0.8760238862759605,
+            "support": 138.0
+        },
+        "weighted avg": {
+            "precision": 0.879830917874396,
+            "recall": 0.8768115942028986,
+            "f1-score": 0.8771696432605978,
+            "support": 138.0
+        }
+    }
+}

@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Card Approval Prediction | Cloud Computing Project</title>
+    <!-- Modern Typography from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <!-- Header & Navigation -->
+    <header class="app-header">
+        <div class="container header-container">
+            <div class="brand">
+                <div class="logo-icon">💳</div>
+                <div>
+                    <h1 class="brand-title">Credit Card Approval Prediction</h1>
+                    <p class="brand-subtitle">Cloud Computing Machine Learning Project &bull; Logistic Regression with GridSearchCV</p>
+                </div>
+            </div>
+            <div class="header-badges">
+                {% if model_loaded %}
+                    <span class="status-badge status-online">
+                        <span class="dot"></span> Model Ready
+                    </span>
+                {% else %}
+                    <span class="status-badge status-offline">
+                        <span class="dot"></span> Model Missing
+                    </span>
+                {% endif %}
+                <span class="status-badge status-cloud">
+                    ☁️ Cloud Run Ready
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container main-content">
+
+        <!-- Missing Model Warning Banner -->
+        {% if not model_loaded %}
+        <div class="alert-box alert-warning">
+            <div class="alert-icon">⚠️</div>
+            <div class="alert-body">
+                <h3>Trained Model Not Found</h3>
+                <p>The machine learning pipeline has not been trained yet. Please open your PowerShell terminal and run:</p>
+                <code>python train_model.py</code>
+                <p>This will automatically download the UCI dataset, train the Logistic Regression classifier with GridSearchCV, and save the pipeline to <code>models/model.joblib</code>.</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Overview & Model Metrics Section -->
+        <section class="section-card metrics-section" id="metrics-card">
+            <div class="section-header">
+                <div>
+                    <h2>Model Performance & Evaluation</h2>
+                    <p class="section-desc">Evaluated on a 20% holdout test set from the UCI Credit Approval dataset (crx.data)</p>
+                </div>
+                <div class="api-links">
+                    <a href="/health" target="_blank" class="text-link">GET /health ↗</a>
+                    <a href="/metrics" target="_blank" class="text-link">GET /metrics ↗</a>
+                </div>
+            </div>
+
+            {% if metrics %}
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <span class="metric-label">Test Accuracy</span>
+                    <span class="metric-value">{{ "%.2f"|format(metrics.accuracy * 100) }}%</span>
+                    <span class="metric-sub">Overall correct predictions</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Precision</span>
+                    <span class="metric-value">{{ "%.2f"|format(metrics.precision * 100) }}%</span>
+                    <span class="metric-sub">Approval prediction reliability</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Recall</span>
+                    <span class="metric-value">{{ "%.2f"|format(metrics.recall * 100) }}%</span>
+                    <span class="metric-sub">True approvals identified</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">F1-Score</span>
+                    <span class="metric-value">{{ "%.2f"|format(metrics.f1_score * 100) }}%</span>
+                    <span class="metric-sub">Harmonic mean balance</span>
+                </div>
+            </div>
+
+            <!-- Confusion Matrix & Parameters Details -->
+            <div class="details-row">
+                <div class="detail-box">
+                    <h4>Optimal Hyperparameters (GridSearchCV)</h4>
+                    <div class="chips-container">
+                        <span class="chip">C: <strong>{{ metrics.best_hyperparameters.classifier__C }}</strong></span>
+                        <span class="chip">Solver: <strong>{{ metrics.best_hyperparameters.classifier__solver }}</strong></span>
+                        <span class="chip">Class Weight: <strong>{{ metrics.best_hyperparameters.classifier__class_weight or 'Uniform' }}</strong></span>
+                        <span class="chip">CV Folds: <strong>5-Fold Stratified</strong></span>
+                    </div>
+                </div>
+                <div class="detail-box">
+                    <h4>Holdout Confusion Matrix (N = {{ metrics.test_samples }})</h4>
+                    <div class="matrix-grid">
+                        <div class="matrix-cell tn">
+                            <span class="cell-num">{{ metrics.confusion_matrix.true_negatives }}</span>
+                            <span class="cell-txt">True Negatives</span>
+                        </div>
+                        <div class="matrix-cell fp">
+                            <span class="cell-num">{{ metrics.confusion_matrix.false_positives }}</span>
+                            <span class="cell-txt">False Positives</span>
+                        </div>
+                        <div class="matrix-cell fn">
+                            <span class="cell-num">{{ metrics.confusion_matrix.false_negatives }}</span>
+                            <span class="cell-txt">False Negatives</span>
+                        </div>
+                        <div class="matrix-cell tp">
+                            <span class="cell-num">{{ metrics.confusion_matrix.true_positives }}</span>
+                            <span class="cell-txt">True Positives</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p class="muted-text">Metrics will appear here once the model is trained with <code>python train_model.py</code>.</p>
+            {% endif %}
+        </section>
+
+        <!-- Prediction Section -->
+        <section class="section-card form-section">
+            <div class="section-header">
+                <div>
+                    <h2>Applicant Evaluation Form</h2>
+                    <p class="section-desc">Provide applicant attributes to evaluate credit approval likelihood.</p>
+                </div>
+                <div class="presets-toolbar">
+                    <span class="preset-label">Quick Demo Presets:</span>
+                    <button type="button" class="btn btn-outline" id="btn-fill-approved" title="Load sample profile likely to be approved">
+                        🟢 Sample: Approved
+                    </button>
+                    <button type="button" class="btn btn-outline" id="btn-fill-rejected" title="Load sample profile likely to be rejected">
+                        🔴 Sample: Rejected
+                    </button>
+                    <button type="button" class="btn btn-ghost" id="btn-reset-form" title="Clear all fields">
+                        🔄 Reset
+                    </button>
+                </div>
+            </div>
+
+            <!-- Client Validation Message Box -->
+            <div id="validation-alert" class="alert-box alert-error hidden">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-body" id="validation-message"></div>
+            </div>
+
+            <!-- Prediction Form -->
+            <form id="prediction-form" novalidate>
+                
+                <!-- Category 1: Demographics -->
+                <div class="form-category">
+                    <h3 class="category-title">1. Applicant Demographics</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="Age">Age (Years) <span class="req">*</span></label>
+                            <input type="number" id="Age" name="Age" step="0.1" min="18" max="100" placeholder="e.g. 32.5" required>
+                            <span class="hint">Applicant age (18 - 100)</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="Gender">Gender Code <span class="req">*</span></label>
+                            <select id="Gender" name="Gender" required>
+                                <option value="" disabled selected>Select code</option>
+                                <option value="b">b (Male / Primary Group)</option>
+                                <option value="a">a (Female / Secondary Group)</option>
+                            </select>
+                            <span class="hint">UCI Anonymized Gender code</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="Married">Marital Status <span class="req">*</span></label>
+                            <select id="Married" name="Married" required>
+                                <option value="" disabled selected>Select status</option>
+                                <option value="u">u (Married)</option>
+                                <option value="y">y (Single / Unmarried)</option>
+                                <option value="l">l (Divorced / Separated)</option>
+                                <option value="t">t (Other)</option>
+                            </select>
+                            <span class="hint">Marital classification</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="BankCustomer">Bank Customer <span class="req">*</span></label>
+                            <select id="BankCustomer" name="BankCustomer" required>
+                                <option value="" disabled selected>Select relationship</option>
+                                <option value="g">g (Existing Bank Customer)</option>
+                                <option value="p">p (New Customer / Non-Customer)</option>
+                                <option value="gg">gg (Other Banking Relationship)</option>
+                            </select>
+                            <span class="hint">Relationship with the bank</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="Citizen">Citizenship <span class="req">*</span></label>
+                            <select id="Citizen" name="Citizen" required>
+                                <option value="" disabled selected>Select citizenship</option>
+                                <option value="g">g (By Birth)</option>
+                                <option value="s">s (By Naturalization)</option>
+                                <option value="p">p (Other / Temporary Resident)</option>
+                            </select>
+                            <span class="hint">Citizenship classification</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Category 2: Financial & Credit History -->
+                <div class="form-category">
+                    <h3 class="category-title">2. Financial & Credit Record</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="Income">Annual / Monthly Income ($) <span class="req">*</span></label>
+                            <input type="number" id="Income" name="Income" step="1" min="0" placeholder="e.g. 2500" required>
+                            <span class="hint">Reported continuous income</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="Debt">Debt Level <span class="req">*</span></label>
+                            <input type="number" id="Debt" name="Debt" step="0.01" min="0" placeholder="e.g. 4.50" required>
+                            <span class="hint">Continuous debt index (e.g. 0.0 - 28.0)</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="PriorDefault">Prior Default Flag <span class="req">*</span></label>
+                            <select id="PriorDefault" name="PriorDefault" required>
+                                <option value="" disabled selected>Select status</option>
+                                <option value="t">t (Prior Default / Positive Credit Flag)</option>
+                                <option value="f">f (No Prior Default / Clean Record)</option>
+                            </select>
+                            <span class="hint">UCI dataset binary credit history indicator</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="CreditScore">Credit Score / Delinquency Index <span class="req">*</span></label>
+                            <input type="number" id="CreditScore" name="CreditScore" step="1" min="0" max="100" placeholder="e.g. 6" required>
+                            <span class="hint">UCI credit score / delinquency count (0 - 67)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Category 3: Employment & Profile -->
+                <div class="form-category">
+                    <h3 class="category-title">3. Employment & Profile Attributes</h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="Employed">Currently Employed <span class="req">*</span></label>
+                            <select id="Employed" name="Employed" required>
+                                <option value="" disabled selected>Select status</option>
+                                <option value="t">t (Currently Employed)</option>
+                                <option value="f">f (Unemployed / Inactive)</option>
+                            </select>
+                            <span class="hint">Active employment indicator</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="YearsEmployed">Years Employed <span class="req">*</span></label>
+                            <input type="number" id="YearsEmployed" name="YearsEmployed" step="0.1" min="0" max="50" placeholder="e.g. 4.0" required>
+                            <span class="hint">Duration at current/previous job (years)</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="EducationLevel">Education / Industry Sector <span class="req">*</span></label>
+                            <select id="EducationLevel" name="EducationLevel" required>
+                                <option value="" disabled selected>Select sector</option>
+                                <option value="q">q (Professional / Specialist)</option>
+                                <option value="w">w (White Collar / Office)</option>
+                                <option value="m">m (Management / Executive)</option>
+                                <option value="cc">cc (Consulting / Services)</option>
+                                <option value="c">c (Corporate / Commercial)</option>
+                                <option value="x">x (Technical / Engineering)</option>
+                                <option value="k">k (Labor / Operations)</option>
+                                <option value="i">i (Information / Admin)</option>
+                                <option value="e">e (Education)</option>
+                                <option value="aa">aa (Applied Arts / Creative)</option>
+                                <option value="ff">ff (Finance / Insurance)</option>
+                                <option value="d">d (Design / Craft)</option>
+                                <option value="j">j (Junior Staff / Entry)</option>
+                                <option value="r">r (Research)</option>
+                            </select>
+                            <span class="hint">Applicant domain or industry classification</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="Ethnicity">Ethnicity Group <span class="req">*</span></label>
+                            <select id="Ethnicity" name="Ethnicity" required>
+                                <option value="" disabled selected>Select group</option>
+                                <option value="v">v (Group V)</option>
+                                <option value="h">h (Group H)</option>
+                                <option value="bb">bb (Group BB)</option>
+                                <option value="ff">ff (Group FF)</option>
+                                <option value="j">j (Group J)</option>
+                                <option value="z">z (Group Z)</option>
+                                <option value="dd">dd (Group DD)</option>
+                                <option value="n">n (Group N)</option>
+                                <option value="o">o (Other)</option>
+                            </select>
+                            <span class="hint">Demographic grouping in dataset</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="DriversLicense">Driver's License <span class="req">*</span></label>
+                            <select id="DriversLicense" name="DriversLicense" required>
+                                <option value="" disabled selected>Select</option>
+                                <option value="t">t (Yes, has license)</option>
+                                <option value="f">f (No, does not have license)</option>
+                            </select>
+                            <span class="hint">Valid driver's license</span>
+                        </div>
+                        <div class="form-group">
+                            <label for="ZipCode">Zip / Postal Code <span class="req">*</span></label>
+                            <input type="number" id="ZipCode" name="ZipCode" step="1" min="0" max="99999" placeholder="e.g. 120" required>
+                            <span class="hint">Location postal code (0 - 2000)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" id="btn-submit">
+                        <span class="btn-text">Predict Approval</span>
+                        <span class="spinner hidden" id="spinner"></span>
+                    </button>
+                </div>
+            </form>
+
+            <!-- Result Card (Displays dynamically on prediction) -->
+            <div id="result-container" class="result-box hidden">
+                <div class="result-header">
+                    <span class="result-tag" id="result-tag">Prediction Result</span>
+                    <span class="request-id" id="result-req-id">Req ID: --</span>
+                </div>
+                
+                <div class="result-verdict" id="result-verdict">
+                    <!-- Dynamic: Likely Approved / Likely Rejected -->
+                </div>
+
+                <div class="result-details">
+                    <div class="confidence-bar-container">
+                        <div class="confidence-labels">
+                            <span>Model Confidence: <strong id="confidence-val">--%</strong></span>
+                            <span id="duration-val" class="text-muted">Duration: -- ms</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="probability-split">
+                        <div class="prob-item">
+                            <span class="prob-label">Approval Probability:</span>
+                            <span class="prob-num approved-num" id="prob-approved-val">--%</span>
+                        </div>
+                        <div class="prob-item">
+                            <span class="prob-label">Rejection Probability:</span>
+                            <span class="prob-num rejected-num" id="prob-rejected-val">--%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="disclaimer-note">
+                    <strong>Educational Disclaimer:</strong> This prediction is generated by a Scikit-Learn Logistic Regression model with GridSearchCV for an academic Cloud Computing college demonstration. It does not represent an actual financial lending decision.
+                </div>
+            </div>
+
+        </section>
+
+        <!-- Academic & Architecture Info Section -->
+        <section class="section-card architecture-section">
+            <div class="section-header">
+                <div>
+                    <h2>Application Architecture & Request Flow</h2>
+                    <p class="section-desc">Designed for Cloud Computing deployment on Google Cloud Run</p>
+                </div>
+            </div>
+
+            <div class="flow-steps">
+                <div class="flow-step">
+                    <div class="step-num">1</div>
+                    <div class="step-content">
+                        <h4>Client Submission</h4>
+                        <p>User enters applicant features into the dashboard. Frontend validates fields and sends a <code>POST /predict</code> request.</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-num">2</div>
+                    <div class="step-content">
+                        <h4>Flask API & Validation</h4>
+                        <p>Flask backend receives payload, generates a unique Request ID, validates data types, and checks constraints.</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-num">3</div>
+                    <div class="step-content">
+                        <h4>Scikit-Learn Pipeline</h4>
+                        <p>Input passes through preprocessor (Median/Frequent Imputation, StandardScaler, OneHotEncoder) and Logistic Regression model.</p>
+                    </div>
+                </div>
+                <div class="flow-step">
+                    <div class="step-num">4</div>
+                    <div class="step-content">
+                        <h4>Sanitized Cloud Logging</h4>
+                        <p>Outputs prediction verdict, confidence, duration, and status to <code>stdout</code> for Google Cloud Logging, avoiding PII leakage.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+        <div class="container footer-content">
+            <p>Cloud Computing College Project &bull; Machine Learning Web Application</p>
+            <p class="disclaimer-inline">Notice: Strictly educational. Do not submit real card credentials, CVVs, or sensitive personal data.</p>
+        </div>
+    </footer>
+
+    <!-- Interactive Client Script -->
+    <script>
+        // Preset sample profiles for fast and impressive testing
+        const SAMPLES = {
+            approved: {
+                Age: 32.5,
+                Gender: "b",
+                Married: "u",
+                BankCustomer: "g",
+                Citizen: "g",
+                Income: 2500,
+                Debt: 4.5,
+                PriorDefault: "t",
+                CreditScore: 6,
+                Employed: "t",
+                YearsEmployed: 4.0,
+                EducationLevel: "q",
+                Ethnicity: "v",
+                DriversLicense: "t",
+                ZipCode: 120
+            },
+            rejected: {
+                Age: 21.0,
+                Gender: "a",
+                Married: "y",
+                BankCustomer: "p",
+                Citizen: "s",
+                Income: 0,
+                Debt: 0.5,
+                PriorDefault: "f",
+                CreditScore: 0,
+                Employed: "f",
+                YearsEmployed: 0.2,
+                EducationLevel: "k",
+                Ethnicity: "h",
+                DriversLicense: "f",
+                ZipCode: 360
+            }
+        };
+
+        const form = document.getElementById("prediction-form");
+        const btnSubmit = document.getElementById("btn-submit");
+        const btnText = btnSubmit.querySelector(".btn-text");
+        const spinner = document.getElementById("spinner");
+        const validationAlert = document.getElementById("validation-alert");
+        const validationMsg = document.getElementById("validation-message");
+        const resultContainer = document.getElementById("result-container");
+
+        // Quick Preset Fill Handlers
+        document.getElementById("btn-fill-approved").addEventListener("click", () => fillForm(SAMPLES.approved));
+        document.getElementById("btn-fill-rejected").addEventListener("click", () => fillForm(SAMPLES.rejected));
+        document.getElementById("btn-reset-form").addEventListener("click", () => {
+            form.reset();
+            hideAlert();
+            resultContainer.classList.add("hidden");
+        });
+
+        function fillForm(data) {
+            hideAlert();
+            for (const [key, val] of Object.entries(data)) {
+                const input = document.getElementById(key);
+                if (input) {
+                    input.value = val;
+                }
+            }
+            // Highlight form briefly to indicate populated data
+            form.classList.add("form-populated");
+            setTimeout(() => form.classList.remove("form-populated"), 600);
+        }
+
+        function showAlert(msg) {
+            validationMsg.textContent = msg;
+            validationAlert.classList.remove("hidden");
+            validationAlert.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        function hideAlert() {
+            validationAlert.classList.add("hidden");
+        }
+
+        // Form Submit Handler
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            hideAlert();
+
+            // Client-side completeness check
+            const formData = new FormData(form);
+            const payload = {};
+            let hasEmptyField = false;
+
+            for (const [key, value] of formData.entries()) {
+                if (value === null || value.trim() === "") {
+                    hasEmptyField = true;
+                    break;
+                }
+                payload[key] = value;
+            }
+
+            // Also check all inputs
+            const requiredFields = ["Age", "Gender", "Married", "BankCustomer", "Citizen", "Income", "Debt", "PriorDefault", "CreditScore", "Employed", "YearsEmployed", "EducationLevel", "Ethnicity", "DriversLicense", "ZipCode"];
+            for (const field of requiredFields) {
+                if (!payload[field] || payload[field].trim() === "") {
+                    showAlert(`Please fill in the '${field}' field.`);
+                    const el = document.getElementById(field);
+                    if (el) el.focus();
+                    return;
+                }
+            }
+
+            // Validate numerical ranges
+            if (Number(payload.Age) < 18) {
+                showAlert("Applicant Age must be at least 18.");
+                return;
+            }
+            if (Number(payload.Income) < 0 || Number(payload.Debt) < 0 || Number(payload.YearsEmployed) < 0 || Number(payload.CreditScore) < 0) {
+                showAlert("Income, Debt, Years Employed, and Credit Score cannot be negative.");
+                return;
+            }
+
+            // UI: Loading State
+            btnSubmit.disabled = true;
+            spinner.classList.remove("hidden");
+            btnText.textContent = "Analyzing Application...";
+            resultContainer.classList.add("hidden");
+
+            try {
+                const response = await fetch("/predict", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `Server returned error (${response.status})`);
+                }
+
+                // Render Result
+                displayResult(data);
+
+            } catch (err) {
+                showAlert(err.message || "An unexpected error occurred while processing the prediction.");
+            } finally {
+                // UI: Reset Loading State
+                btnSubmit.disabled = false;
+                spinner.classList.add("hidden");
+                btnText.textContent = "Predict Approval";
+            }
+        });
+
+        function displayResult(data) {
+            const verdictBox = document.getElementById("result-verdict");
+            const reqIdBox = document.getElementById("result-req-id");
+            const confVal = document.getElementById("confidence-val");
+            const durationVal = document.getElementById("duration-val");
+            const fillBar = document.getElementById("progress-fill");
+            const probApprovedVal = document.getElementById("prob-approved-val");
+            const probRejectedVal = document.getElementById("prob-rejected-val");
+
+            reqIdBox.textContent = `Req ID: #${data.request_id}`;
+            confVal.textContent = data.confidence_percent;
+            durationVal.textContent = `Duration: ${data.duration_ms} ms`;
+
+            probApprovedVal.textContent = `${(data.probability_approved * 100).toFixed(1)}%`;
+            probRejectedVal.textContent = `${(data.probability_rejected * 100).toFixed(1)}%`;
+
+            if (data.is_approved) {
+                resultContainer.className = "result-box result-approved";
+                verdictBox.innerHTML = `
+                    <div class="verdict-icon">✅</div>
+                    <div class="verdict-text">
+                        <h3>Likely Approved</h3>
+                        <p>Based on financial and employment attributes, the model predicts high likelihood of approval.</p>
+                    </div>
+                `;
+                fillBar.style.width = data.confidence_percent;
+                fillBar.style.backgroundColor = "#10b981";
+            } else {
+                resultContainer.className = "result-box result-rejected";
+                verdictBox.innerHTML = `
+                    <div class="verdict-icon">❌</div>
+                    <div class="verdict-text">
+                        <h3>Likely Rejected</h3>
+                        <p>Application indicates higher risk or insufficient qualifying factors based on historical training data.</p>
+                    </div>
+                `;
+                fillBar.style.width = data.confidence_percent;
+                fillBar.style.backgroundColor = "#ef4444";
+            }
+
+            resultContainer.classList.remove("hidden");
+            resultContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+    </script>
+</body>
+</html>
